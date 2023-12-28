@@ -65,6 +65,16 @@ def openFile():
             return World(**json.load(f))
     return None
 
+def saveFile(world, withGrid):
+    filedlg = win32ui.CreateFileDialog(0, None, None, 0, 'JSON Files (*.json)|*.json|All Files (*.*)|*.*|')
+    if filedlg.DoModal() == 1:
+        filename = filedlg.GetPathName()
+        if not filename.endswith('.json'):
+            filename += '.json'
+    else:
+        filename = f'save_{random.randint(0, 1000000)}.json'
+    world.save(filename, withGrid=withGrid)
+
 def render(screen, world, pixelsize):
     for y in range(world.height):
         for x in range(world.width):
@@ -93,9 +103,9 @@ if __name__ == '__main__':
                 pixelsize = SCREENSIZE//GRIDSIZE
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_g:
-                    world.save(f'save_{random.randint(0, 1000000)}.json')
+                    saveFile(world, withGrid=False)
                 elif event.key == pygame.K_s:
-                    world.save(f'save_{random.randint(0, 1000000)}.json', withGrid=False)
+                    saveFile(world, withGrid=True)
                 elif event.key == pygame.K_ESCAPE:
                     sys.exit()
                 elif event.key == pygame.K_o:
@@ -112,7 +122,7 @@ if __name__ == '__main__':
             world.step()
             render(screen, world, pixelsize)
         else:
-            font = pygame.font.SysFont('Arial', 30)
+            font = pygame.font.SysFont('Consolas', 30)
             text = font.render('Paused', True, (255, 255, 255))
             textRect = text.get_rect()
             textRect.center = (textRect.width//2+10, textRect.height//2+10)
@@ -121,5 +131,3 @@ if __name__ == '__main__':
 
         pygame.display.flip()
         pygame.display.set_caption(f'Ants: {world.steps} steps')
-
-    
