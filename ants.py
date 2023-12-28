@@ -1,4 +1,4 @@
-import random,colorsys,pygame,sys,json
+import random,colorsys,pygame,sys,json,win32ui,win32con
 class World:
     def __init__(self, *args, **kwargs):
         self.width = kwargs.get('width', 100)
@@ -54,6 +54,17 @@ class World:
     def __str__(self):
         return '\n'.join([''.join([chr(9608) for x in range(self.width)]) for y in range(self.height)])
     
+def openFile():
+    filedlg = win32ui.CreateFileDialog(1, None, None, win32con.OFN_FILEMUSTEXIST, 'JSON Files (*.json)|*.json|All Files (*.*)|*.*|')
+    if filedlg.DoModal() == win32con.IDOK:
+        filename = filedlg.GetPathName()
+    else:
+        filename = None
+    if filename:
+        with open(filename, 'r') as f:
+            return World(**json.load(f))
+    return None
+
 if __name__ == '__main__':
     pygame.init()
     SCREENSIZE = 500
@@ -66,6 +77,7 @@ if __name__ == '__main__':
         world = World(width=GRIDSIZE, height=GRIDSIZE, rule='LRRRRRLLR')
     clock = pygame.time.Clock()
     pixelsize = SCREENSIZE//GRIDSIZE
+    paused = False
     while True:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:   sys.exit()
@@ -80,12 +92,27 @@ if __name__ == '__main__':
                     world.save(f'save_{random.randint(0, 1000000)}.json', withGrid=False)
                 elif event.key == pygame.K_ESCAPE:
                     sys.exit()
-        world.step()
-        for y in range(world.height):
-            for x in range(world.width):
-                col = world.get(x, y)
-                pygame.draw.rect(screen, col, (x*pixelsize, y*pixelsize, pixelsize, pixelsize))
+                elif event.key == pygame.K_o:
+                    world = openFile()
+                    if world:
+                        pixelsize = SCREENSIZE//GRIDSIZE
+                elif event.key == pygame.K_SPACE:
+                    paused = not paused
+                elif event.key == pygame.K_RETURN:
+                    world.step()
+        if not paused:  
+            world.step()
+            for y in range(world.height):
+                for x in range(world.width):
+                    col = world.get(x, y)
+                    pygame.draw.rect(screen, col, (x*pixelsize, y*pixelsize, pixelsize, pixelsize))
+        else:
+            font = pygame.font.SysFont('Arial', 30)
+            text = font.render('Paused', True, (255, 255, 255))
+            textRect = text.get_rect()
+            textRect.center = (textRect.width//2+10, textRect.height//2+10)
+            screen.blit(text, textRect)
+            pygame.display.update()
+
         pygame.display.flip()
         pygame.display.set_caption(f'Ants: {world.steps} steps')
-
-    
