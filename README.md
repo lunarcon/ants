@@ -30,5 +30,9 @@ grid items represent color indices.
 - multiple ants
 - termites
 
+# installation
+
+```python -m pip install -r 'requirements.txt'```
+
 # why
 why not
