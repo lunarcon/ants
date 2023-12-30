@@ -1,4 +1,4 @@
-import random,colorsys,pygame,sys,json,win32ui
+import random,colorsys,pygame,sys,json,win32ui,os,win32gui,win32con
 class World:
     def __init__(self, *args, **kwargs):
         self.width = kwargs.get('width', 100)
@@ -50,11 +50,8 @@ class World:
         self.index += 1
         self.index %= len(self.rule)
         self.steps += 1
-
-    def __str__(self):
-        return '\n'.join([''.join([chr(9608) for x in range(self.width)]) for y in range(self.height)])
     
-def openFile():
+def openFile(world):
     filedlg = win32ui.CreateFileDialog(1, None, None, 4096, 'JSON Files (*.json)|*.json|All Files (*.*)|*.*|')
     if filedlg.DoModal() == 1:
         filename = filedlg.GetPathName()
@@ -63,17 +60,23 @@ def openFile():
     if filename:
         with open(filename, 'r') as f:
             return World(**json.load(f))
-    return None
+    return world
 
 def saveFile(world, withGrid):
     filedlg = win32ui.CreateFileDialog(0, None, None, 0, 'JSON Files (*.json)|*.json|All Files (*.*)|*.*|')
+    filedlg.SetOFNInitialDir(f'{os.getcwd()}')
     if filedlg.DoModal() == 1:
         filename = filedlg.GetPathName()
         if not filename.endswith('.json'):
             filename += '.json'
     else:
-        filename = f'save_{random.randint(0, 1000000)}.json'
-    world.save(filename, withGrid=withGrid)
+        mb = win32gui.MessageBox(0, 'Save with default name?', 'Save', win32con.MB_YESNO)
+        if mb == win32con.IDYES:
+            filename = f'save_{random.randint(0, 1000000)}.json'
+        else:
+            filename = None
+    if filename:
+        world.save(filename, withGrid=withGrid)
 
 def render(screen, world, pixelsize):
     for y in range(world.height):
@@ -84,12 +87,14 @@ def render(screen, world, pixelsize):
 if __name__ == '__main__':
     pygame.init()
     SCREENSIZE = 500
-    GRIDSIZE = 100
     screen = pygame.display.set_mode((SCREENSIZE, SCREENSIZE), pygame.RESIZABLE)
+    SELECTED = None
     if len(sys.argv) > 1:
         with open(sys.argv[1], 'r') as f:
             world = World(**json.load(f))
+            GRIDSIZE = world.width
     else:
+        GRIDSIZE = 100
         world = World(width=GRIDSIZE, height=GRIDSIZE, rule='LRRRRRLLR')
     clock = pygame.time.Clock()
     pixelsize = SCREENSIZE//GRIDSIZE
@@ -109,7 +114,7 @@ if __name__ == '__main__':
                 elif event.key == pygame.K_ESCAPE:
                     sys.exit()
                 elif event.key == pygame.K_o:
-                    world = openFile()
+                    world = openFile(world)
                     if world:
                         pixelsize = SCREENSIZE//GRIDSIZE
                         paused = False
@@ -118,6 +123,32 @@ if __name__ == '__main__':
                 elif event.key == pygame.K_RETURN:
                     world.step()
                     render(screen, world, pixelsize)
+                elif event.key == pygame.K_r:
+                    font = pygame.font.SysFont('Consolas', 30)
+                    text = font.render(world.rule, True, (255, 255, 255))
+                    textRect = text.get_rect()
+                    textRect.center = (textRect.width//2+10, textRect.height//2+10)
+                    col = world.colors[0]
+                    pygame.draw.rect(screen, (col[0]//2,col[1]//2,col[2]//2), (0, 0, textRect.width+20, textRect.height+20))
+                    screen.blit(text, textRect)
+                    for i in range(len(world.colors)):
+                        col = world.colors[i]
+                        pygame.draw.rect(screen, col, (0, textRect.height+20+i*30, 30, 30))
+                        cid = font.render(str(i), True, (255, 255, 255))
+                        cidRect = cid.get_rect()
+                        cidRect.center = (15, textRect.height+35+i*30)
+                        screen.blit(cid, cidRect)
+                    pygame.display.update()
+                    pygame.time.wait(1000)
+                elif event.key == pygame.K_h:
+                    win32gui.MessageBox(0, 'Controls:\n\nSpace:\tPause\nEnter:\tStep\nR:\tShow Rule\nClick:\tSet color (cycles through rule colors)\nG:\tSave without grid\nS:\tSave with grid\nO:\tOpen\nEsc:\tQuit', 'Help', win32con.MB_OK)
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 1:
+                    SELECTED = pygame.mouse.get_pos()
+                    SELECTED = (SELECTED[0]//pixelsize, SELECTED[1]//pixelsize)
+                    world.set(*SELECTED, world.colors[(world.colors.index(world.get(*SELECTED))+1)%len(world.colors)])
+                    render(screen, world, pixelsize)
+                    SELECTED = None
         if not paused:  
             world.step()
             render(screen, world, pixelsize)
@@ -126,8 +157,10 @@ if __name__ == '__main__':
             text = font.render('Paused', True, (255, 255, 255))
             textRect = text.get_rect()
             textRect.center = (textRect.width//2+10, textRect.height//2+10)
+            col = world.colors[0]
+            pygame.draw.rect(screen, (col[0]//2,col[1]//2,col[2]//2), (0, 0, textRect.width+20, textRect.height+20))
             screen.blit(text, textRect)
             pygame.display.update()
 
         pygame.display.flip()
-        pygame.display.set_caption(f'Ants: {world.steps} steps')
+        pygame.display.set_caption(f'Ants: {world.steps} steps' + (' (Paused)' if paused else ''))
